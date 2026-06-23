@@ -391,13 +391,13 @@ object Crafting : IonServerComponent() {
 			setIngredient('n', IRON_NUGGET)
 			setIngredient('i', IRON_INGOT)
 		}
-		shaped("Unloaded_Shell", UNLOADED_SHELL.getValue().constructItemStack(), CraftingBookCategory.MISC) {
+		shapeless("Unloaded_Shell", UNLOADED_SHELL.getValue().constructItemStack(), CraftingBookCategory.MISC) {
 			shape(" y ", " z ")
 
 			setIngredient('y', LAPIS_LAZULI)
 			setIngredient('z', ExactChoice(TITANIUM_INGOT.getValue().constructItemStack()))
 		}
-		shaped("Uncharged_Shell", UNCHARGED_SHELL.getValue().constructItemStack(), CraftingBookCategory.MISC) {
+		shapeless("Uncharged_Shell", UNCHARGED_SHELL.getValue().constructItemStack(), CraftingBookCategory.MISC) {
 			shape(" y ", " z ")
 
 			setIngredient('y', PRISMARINE_CRYSTALS)
