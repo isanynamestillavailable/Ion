@@ -3,6 +3,7 @@ package net.horizonsend.ion.server.features.starship.subsystem.shield
 import net.horizonsend.ion.common.database.schema.misc.PlayerSettings
 import net.horizonsend.ion.common.utils.miscellaneous.d
 import net.horizonsend.ion.server.command.admin.debugRed
+import net.horizonsend.ion.server.features.player.NewPlayerProtection.hasProtection
 import net.horizonsend.ion.server.core.IonServerComponent
 import net.horizonsend.ion.server.features.cache.PlayerSettingsCache.getSettingOrThrow
 //import net.horizonsend.ion.server.features.nations.NationBuffTypes
@@ -11,8 +12,11 @@ import net.horizonsend.ion.server.features.starship.Starship
 import net.horizonsend.ion.server.features.starship.active.ActiveControlledStarship
 import net.horizonsend.ion.server.features.starship.active.ActiveStarship
 import net.horizonsend.ion.server.features.starship.active.ActiveStarships
+import net.horizonsend.ion.server.features.starship.control.controllers.player.PlayerController
 import net.horizonsend.ion.server.features.starship.event.StarshipActivatedEvent
 import net.horizonsend.ion.server.features.starship.event.StarshipDeactivatedEvent
+import net.horizonsend.ion.server.features.world.IonWorld.Companion.hasFlag
+import net.horizonsend.ion.server.features.world.WorldFlag
 import net.horizonsend.ion.server.features.starship.status_effects.StarshipStatusEffectTypes
 import net.horizonsend.ion.server.listener.misc.ProtectionListener
 import net.horizonsend.ion.server.miscellaneous.utils.SLTextStyle
@@ -254,7 +258,15 @@ object StarshipShields : IonServerComponent() {
 			return
 		}
 
-		val damagedPercent = blocks.size.toFloat() / size.toFloat()
+		var damagedPercent = blocks.size.toFloat() / size.toFloat()
+
+
+		if (starship.playerPilot?.hasProtection() == true) {
+			// The attacked starship has a player pilot with protection; check for noob prot
+			if (handleNewProt(starship)) {
+				damagedPercent = 0.0f
+			}
+		}
 
 		shieldLoop@
 		for (shield: ShieldSubsystem in starship.shields) {
@@ -386,5 +398,27 @@ object StarshipShields : IonServerComponent() {
 		percent <= 0.70     -> Material.LIGHT_BLUE_STAINED_GLASS // close to CYAN tier
 		percent <= 0.85     -> Material.LIGHT_BLUE_STAINED_GLASS
 		else                -> Material.BLUE_STAINED_GLASS
+	}
+
+	private fun handleNewProt(starship: ActiveStarship) : Boolean {
+		// New player protection only applies to ships controlled by a player.
+		// Non-player controlled ships should take normal shield damage.
+		val player = (starship.controller as? PlayerController)?.player ?: return false
+
+		// In NOT_SECURE or ARENA worlds, new player protection does not prevent ship damage.
+		if (player.world.hasFlag(WorldFlag.NOT_SECURE) || player.world.hasFlag(WorldFlag.ARENA)) return false
+
+		// If this ship has been damaged by another ship, check whether that other ship
+		// was also damaged by this protected player. That means the protected player
+		// has participated in ship combat, so their protection should not suppress
+		// shield damage from this explosion.
+		for (damager in starship.damagers.keys) {
+			val otherDamagers = damager.starship?.damagers?.keys ?: continue
+			if (otherDamagers.any { it.starship?.playerPilot == player }) return false
+		}
+
+		// The pilot is protected and has not reciprocated ship combat, so callers can
+		// treat the hit as protected and avoid charging shield power for it.
+		return true
 	}
 }
